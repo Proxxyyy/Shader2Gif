@@ -1,0 +1,4 @@
+/shader2gif
+build/
+*.ppm
+*.mp4
