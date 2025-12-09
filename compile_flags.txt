@@ -1,0 +1,3 @@
+# clangd compile flags
+-Iinclude
+-I/usr/local/include
