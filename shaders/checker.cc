@@ -1,19 +1,18 @@
+// Inspired by Tsoding
+// https://gist.github.com/rexim/ef86bf70918034a5a57881456c0a0ccf
+
 #include "shaders.hh"
 
-void checker(int x, int y, int frame, unsigned char& r, unsigned char& g, unsigned char& b)
+void checker(int x, int y, int frame, glm::vec3& color)
 {
-    bool is_checker = ((x + frame) / 144 + (y + frame) / 144) % 2 != 0;
+    bool is_checker = ((x + frame) / 60 + (y + frame) / 60) % 2 != 0;
 
     if (is_checker)
     {
-        r = 0xFF;
-        g = 0x00;
-        b = 0x00;
+        color = glm::vec3(1.0f, 0.0f, 0.0f);
     }
     else
     {
-        r = 0x00;
-        g = 0x00;
-        b = 0x00;
+        color = glm::vec3(0.0f, 0.0f, 0.0f);
     }
 }

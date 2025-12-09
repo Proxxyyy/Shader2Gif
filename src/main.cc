@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
     // Command to pipe raw RGB data to ffmpeg
     std::string dimensions = std::to_string(w) + "x" + std::to_string(h);
     std::string cmd = "ffmpeg -y -f rawvideo -vcodec rawvideo -s " + dimensions +
-                      " -pix_fmt rgb24 -r 144 -i - -c:v libx264 -pix_fmt yuv420p output.mp4";
+                      " -pix_fmt rgb24 -r 60 -i - -c:v libx264 -pix_fmt yuv420p output.mp4";
 
     FILE* pipe = popen(cmd.c_str(), "w");
     if (!pipe)
@@ -42,7 +42,12 @@ int main(int argc, char* argv[])
             {
                 int index = (y * w + x) * 3;
 
-                checker(x, y, i, frame[index], frame[index + 1], frame[index + 2]);
+                glm::vec3 color;
+                checker(x, y, i, color);
+
+                frame[index] = static_cast<unsigned char>(color.r * 255.0f);
+                frame[index + 1] = static_cast<unsigned char>(color.g * 255.0f);
+                frame[index + 2] = static_cast<unsigned char>(color.b * 255.0f);
             }
         }
 
