@@ -4,11 +4,13 @@
 #include <string>
 #include <vector>
 
+#include "shaders.hh"
+
 int main(int argc, char* argv[])
 {
     int w = 1280;
     int h = 720;
-    const int frames = 60;
+    const int frames = 144;
 
     // User input width and height
     if (argc >= 3)
@@ -20,7 +22,7 @@ int main(int argc, char* argv[])
     // Command to pipe raw RGB data to ffmpeg
     std::string dimensions = std::to_string(w) + "x" + std::to_string(h);
     std::string cmd = "ffmpeg -y -f rawvideo -vcodec rawvideo -s " + dimensions +
-                      " -pix_fmt rgb24 -r 60 -i - -c:v libx264 -pix_fmt yuv420p output.mp4";
+                      " -pix_fmt rgb24 -r 144 -i - -c:v libx264 -pix_fmt yuv420p output.mp4";
 
     FILE* pipe = popen(cmd.c_str(), "w");
     if (!pipe)
@@ -40,21 +42,7 @@ int main(int argc, char* argv[])
             {
                 int index = (y * w + x) * 3;
 
-                // Shader Logic
-                bool checker = ((x + i) / 60 + (y + i) / 60) % 2 != 0;
-
-                if (checker)
-                {
-                    frame[index] = 0xFF;
-                    frame[index + 1] = 0x00;
-                    frame[index + 2] = 0x00;
-                }
-                else
-                {
-                    frame[index] = 0x00;
-                    frame[index + 1] = 0x00;
-                    frame[index + 2] = 0x00;
-                }
+                checker(x, y, i, frame[index], frame[index + 1], frame[index + 2]);
             }
         }
 
