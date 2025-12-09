@@ -1,50 +1,68 @@
-#include <fstream>
-#include <iomanip>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
-#include <sstream>
 #include <string>
+#include <vector>
 
-int main()
+int main(int argc, char* argv[])
 {
-    for (int i = 0; i < 60; i++)
+    int w = 1280;
+    int h = 720;
+    const int frames = 60;
+
+    // User input width and height
+    if (argc >= 3)
     {
-        std::stringstream ss;
-        ss << "output-" << std::setw(2) << std::setfill('0') << i << ".ppm";
-        std::string output_path = ss.str();
+        w = std::atoi(argv[1]);
+        h = std::atoi(argv[2]);
+    }
 
-        std::ofstream f(output_path, std::ios::binary);
-        if (!f)
+    // Command to pipe raw RGB data to ffmpeg
+    std::string dimensions = std::to_string(w) + "x" + std::to_string(h);
+    std::string cmd = "ffmpeg -y -f rawvideo -vcodec rawvideo -s " + dimensions +
+                      " -pix_fmt rgb24 -r 60 -i - -c:v libx264 -pix_fmt yuv420p output.mp4";
+
+    FILE* pipe = popen(cmd.c_str(), "w");
+    if (!pipe)
+    {
+        std::cerr << "Error: Could not open pipe to ffmpeg." << std::endl;
+        return 1;
+    }
+
+    // Buffer for one frame (Width * Height * 3 bytes for RGB)
+    std::vector<unsigned char> frame(w * h * 3);
+
+    for (int i = 0; i < frames; ++i)
+    {
+        for (int y = 0; y < h; ++y)
         {
-            std::cerr << "Failed to open " << output_path << " for writing." << std::endl;
-            continue;
-        }
-
-        int w = 16 * 60;
-        int h = 9 * 60;
-        f << "P6\n";
-        f << w << " " << h << "\n";
-        f << "255\n";
-
-        for (int y = 0; y < h; y++)
-        {
-            for (int x = 0; x < w; x++)
+            for (int x = 0; x < w; ++x)
             {
-                if (((x + i) / 60 + (y + i) / 60) % 2)
+                int index = (y * w + x) * 3;
+
+                // Shader Logic
+                bool checker = ((x + i) / 60 + (y + i) / 60) % 2 != 0;
+
+                if (checker)
                 {
-                    f.put(static_cast<char>(0xFF));
-                    f.put(static_cast<char>(0x00));
-                    f.put(static_cast<char>(0x00));
+                    frame[index] = 0xFF;
+                    frame[index + 1] = 0x00;
+                    frame[index + 2] = 0x00;
                 }
                 else
                 {
-                    f.put(static_cast<char>(0x00));
-                    f.put(static_cast<char>(0x00));
-                    f.put(static_cast<char>(0x00));
+                    frame[index] = 0x00;
+                    frame[index + 1] = 0x00;
+                    frame[index + 2] = 0x00;
                 }
             }
         }
-        f.close();
-        std::cout << "Generated " << output_path << std::endl;
+
+        // Write the frame to the pipe
+        fwrite(frame.data(), 1, frame.size(), pipe);
     }
+
+    pclose(pipe);
+
     return 0;
 }
