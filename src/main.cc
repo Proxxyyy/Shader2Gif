@@ -10,7 +10,7 @@ int main(int argc, char* argv[])
 {
     int w = 1280;
     int h = 720;
-    const int frames = 144;
+    const int frames = 60;
 
     // User input width and height
     if (argc >= 3)
@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    // Buffer for one frame (Width * Height * 3 bytes for RGB)
+    // Buffer for one frame (Width * Height * 3 bytes for RGBA)
     std::vector<unsigned char> frame(w * h * 3);
 
     for (int i = 0; i < frames; ++i)
@@ -42,17 +42,31 @@ int main(int argc, char* argv[])
             {
                 int index = (y * w + x) * 3;
 
-                glm::vec3 color;
-                checker(x, y, i, color);
+                glm::vec4 color(0.0f);
+                plasma(x, y, i, color);
 
                 frame[index] = static_cast<unsigned char>(color.r * 255.0f);
                 frame[index + 1] = static_cast<unsigned char>(color.g * 255.0f);
                 frame[index + 2] = static_cast<unsigned char>(color.b * 255.0f);
+                // frame[index + 3] = static_cast<unsigned char>(color.a * 255.0f);
             }
         }
 
         // Write the frame to the pipe
         fwrite(frame.data(), 1, frame.size(), pipe);
+
+        // Debug: Save the first frame as a PPM file
+        if (i == 0)
+        {
+            FILE* debug_file = fopen("first_frame.ppm", "wb");
+            if (debug_file)
+            {
+                fprintf(debug_file, "P6\n%d %d\n255\n", w, h);
+                fwrite(frame.data(), 1, frame.size(), debug_file);
+                fclose(debug_file);
+                std::cout << "Saved first frame to first_frame.ppm" << std::endl;
+            }
+        }
     }
 
     pclose(pipe);

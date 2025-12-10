@@ -3,16 +3,16 @@
 
 #include "shaders.hh"
 
-void checker(int x, int y, int frame, glm::vec3& color)
+void checker(int x, int y, int frame, glm::vec4& color)
 {
     bool is_checker = ((x + frame) / 60 + (y + frame) / 60) % 2 != 0;
 
     if (is_checker)
     {
-        color = glm::vec3(1.0f, 0.0f, 0.0f);
+        color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
     }
     else
     {
-        color = glm::vec3(0.0f, 0.0f, 0.0f);
+        color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
     }
 }
