@@ -23,6 +23,7 @@ int main(int argc, char* argv[])
     std::string dimensions = std::to_string(w) + "x" + std::to_string(h);
     std::string cmd = "ffmpeg -y -f rawvideo -vcodec rawvideo -s " + dimensions +
                       " -pix_fmt rgb24 -r 60 -i - -c:v libx264 -pix_fmt yuv420p output.mp4";
+    // For alpha support: -c:v libvpx-vp9 -pix_fmt yuva420p output.webm"
 
     FILE* pipe = popen(cmd.c_str(), "w");
     if (!pipe)
@@ -42,8 +43,17 @@ int main(int argc, char* argv[])
             {
                 int index = (y * w + x) * 3;
 
-                glm::vec4 color(0.0f);
-                plasma(x, y, i, color);
+                PlasmaShader shader;
+                shader.u.iResolution = glm::vec2(w, h);
+                shader.u.iTime = i * (1.0f / 60.0f); // Assuming 60fps
+                shader.u.iTimeDelta = 1.0f / 60.0f;
+                shader.u.iFrame = i;
+                shader.u.iFrameRate = 60.0f;
+                shader.u.iDuration = frames * (1.0f / 60.0f);
+
+                shader.fragCoord = glm::vec2(x, y);
+                shader.main();
+                glm::vec4 color = shader.fragColor;
 
                 frame[index] = static_cast<unsigned char>(color.r * 255.0f);
                 frame[index + 1] = static_cast<unsigned char>(color.g * 255.0f);
