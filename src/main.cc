@@ -1,30 +1,102 @@
 #include <cstdio>
 #include <cstdlib>
+#include <getopt.h>
 #include <iostream>
 #include <string>
 #include <vector>
 
 #include "shaders.hh"
 
+// Default options values
+int w = 1280;
+int h = 720;
+int fps = 60;
+int duration = 1;
+bool debug = false;
+
+void print_help(const char* program_name)
+{
+    std::cout << "Usage: " << program_name << " [OPTIONS]\n"
+              << "Options:\n"
+              << "  -f, --framerate <fps>    Set frame rate (default: 60)\n"
+              << "  -s, --size <W>x<H>       Set frame size (default: 1280x720)\n"
+              << "  -d, --duration <sec>     Set duration in seconds (default: 1)\n"
+              << "  --debug                  Enable debug mode\n"
+              << "  -h, --help               Show this help message\n";
+}
+
+int parse_options(int argc, char* argv[])
+{
+    static struct option long_options[] = {{"framerate", required_argument, 0, 'f'},
+                                           {"size", required_argument, 0, 's'},
+                                           {"duration", required_argument, 0, 'd'},
+                                           {"debug", no_argument, 0, 0},
+                                           {"help", no_argument, 0, 'h'},
+                                           {0, 0, 0, 0}};
+
+    int opt;
+    int option_index = 0;
+    while ((opt = getopt_long(argc, argv, "f:s:d:h", long_options, &option_index)) != -1)
+    {
+        switch (opt)
+        {
+            case 'f':
+                fps = std::atoi(optarg);
+                if (fps <= 0)
+                {
+                    std::cerr << "Invalid framerate. Use a positive integer." << std::endl;
+                    return 1;
+                }
+                break;
+            case 's':
+                if (sscanf(optarg, "%dx%d", &w, &h) != 2)
+                {
+                    std::cerr << "Invalid size format. Use WxH (e.g., 1280x720)." << std::endl;
+                    return 1;
+                }
+                break;
+            case 'd':
+                duration = std::atoi(optarg);
+                if (duration <= 0)
+                {
+                    std::cerr << "Invalid duration. Use a positive integer." << std::endl;
+                    return 1;
+                }
+                break;
+            case 'h':
+                print_help(argv[0]);
+                return 2; // Exit with success
+
+            case 0: // Long option that have no short option
+                if (std::string(long_options[option_index].name) == "debug")
+                {
+                    debug = true;
+                }
+                break;
+
+            default:
+                std::cerr << "Unrecognized option -" << char(optopt) << ". Use --help for usage information."
+                          << std::endl;
+                return 1;
+        }
+    }
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
-    int w = 1280;
-    int h = 720;
-    const int frames = 60;
-
-    // User input width and height
-    if (argc >= 3)
-    {
-        w = std::atoi(argv[1]);
-        h = std::atoi(argv[2]);
-    }
+    int opt_status = parse_options(argc, argv);
+    if (opt_status == 1)
+        return 1; // Error while parsing options
+    if (opt_status == 2)
+        return 0; // Usage/Help requested. Exit with success
 
     // Command to pipe raw RGB data to ffmpeg
-    std::string dimensions = std::to_string(w) + "x" + std::to_string(h);
-    std::string cmd = "ffmpeg -y -f rawvideo -vcodec rawvideo -s " + dimensions +
-                      " -pix_fmt rgb24 -r 60 -i - -c:v libx264 -pix_fmt yuv420p output.mp4";
+    std::string cmd = "ffmpeg -y -f rawvideo -vcodec rawvideo -s " + std::to_string(w) + "x" + std::to_string(h) +
+                      " -pix_fmt rgb24 -r " + std::to_string(fps) + " -i - -c:v libx264 -pix_fmt yuv420p output.mp4";
     // For alpha support: -c:v libvpx-vp9 -pix_fmt yuva420p output.webm"
 
+    // Open pipe to ffmpeg
     FILE* pipe = popen(cmd.c_str(), "w");
     if (!pipe)
     {
@@ -32,7 +104,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    // Buffer for one frame (Width * Height * 3 bytes for RGBA)
+    int frames = duration * fps;
     std::vector<unsigned char> frame(w * h * 3);
 
     for (int i = 0; i < frames; ++i)
@@ -45,11 +117,11 @@ int main(int argc, char* argv[])
 
                 PlasmaShader shader;
                 shader.u.iResolution = glm::vec2(w, h);
-                shader.u.iTime = i * (1.0f / 60.0f); // Assuming 60fps
-                shader.u.iTimeDelta = 1.0f / 60.0f;
+                shader.u.iTime = i * (1.0f / fps);
+                shader.u.iTimeDelta = 1.0f / fps;
                 shader.u.iFrame = i;
-                shader.u.iFrameRate = 60.0f;
-                shader.u.iDuration = frames * (1.0f / 60.0f);
+                shader.u.iFrameRate = static_cast<float>(fps);
+                shader.u.iDuration = static_cast<float>(duration);
 
                 shader.fragCoord = glm::vec2(x, y);
                 shader.main();
@@ -66,7 +138,7 @@ int main(int argc, char* argv[])
         fwrite(frame.data(), 1, frame.size(), pipe);
 
         // Debug: Save the first frame as a PPM file
-        if (i == 0)
+        if (debug && i == 0)
         {
             FILE* debug_file = fopen("first_frame.ppm", "wb");
             if (debug_file)
