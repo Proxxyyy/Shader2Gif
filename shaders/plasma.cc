@@ -3,7 +3,6 @@
 
 #include "shaders.hh"
 
-
 void PlasmaShader::main()
 {
     glm::vec2 FC = fragCoord;

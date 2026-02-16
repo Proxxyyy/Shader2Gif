@@ -3,7 +3,6 @@
 
 #include "shaders.hh"
 
-
 void CheckerShader::main()
 {
     int x = static_cast<int>(fragCoord.x);

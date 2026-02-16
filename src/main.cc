@@ -1,8 +1,10 @@
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <getopt.h>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "shaders.hh"
@@ -11,7 +13,7 @@
 int w = 1280;
 int h = 720;
 int fps = 60;
-int duration = 1;
+int duration = 3;
 bool debug = false;
 
 void print_help(const char* program_name)
@@ -107,9 +109,13 @@ int main(int argc, char* argv[])
     int frames = duration * fps;
     std::vector<unsigned char> frame(w * h * 3);
 
-    for (int i = 0; i < frames; ++i)
+    // Available system threads
+    unsigned int nb_threads = std::thread::hardware_concurrency();
+
+    // Lambda to compute pixels for a number of rows
+    auto process_rows = [&](int start_y, int end_y, int frame_idx)
     {
-        for (int y = 0; y < h; ++y)
+        for (int y = start_y; y < end_y; ++y)
         {
             for (int x = 0; x < w; ++x)
             {
@@ -117,9 +123,9 @@ int main(int argc, char* argv[])
 
                 PlasmaShader shader;
                 shader.u.iResolution = glm::vec2(w, h);
-                shader.u.iTime = i * (1.0f / fps);
+                shader.u.iTime = frame_idx * (1.0f / fps);
                 shader.u.iTimeDelta = 1.0f / fps;
-                shader.u.iFrame = i;
+                shader.u.iFrame = frame_idx;
                 shader.u.iFrameRate = static_cast<float>(fps);
                 shader.u.iDuration = static_cast<float>(duration);
 
@@ -132,6 +138,30 @@ int main(int argc, char* argv[])
                 frame[index + 2] = static_cast<unsigned char>(color.b * 255.0f);
                 // frame[index + 3] = static_cast<unsigned char>(color.a * 255.0f);
             }
+        }
+    };
+
+    // Main loop
+    auto start_time = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < frames; ++i)
+    {
+        std::vector<std::thread> threads;
+        int rows_per_thread = h / nb_threads;
+        unsigned int rest = h % nb_threads;
+
+        // Create the threads
+        int start_y = 0;
+        for (unsigned int n = 0; n < nb_threads; ++n)
+        {
+            int end_y = start_y + rows_per_thread + (n < rest ? 1 : 0);
+            threads.emplace_back(process_rows, start_y, end_y, i);
+            start_y = end_y;
+        }
+
+        // Wait for all the threads to finish
+        for (std::thread& thread: threads)
+        {
+            thread.join();
         }
 
         // Write the frame to the pipe
@@ -150,8 +180,15 @@ int main(int argc, char* argv[])
             }
         }
     }
+    auto end_time = std::chrono::high_resolution_clock::now();
 
     pclose(pipe);
+
+    if (debug)
+    {
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        std::cout << "Video generation took " << duration.count() << " ms." << std::endl;
+    }
 
     return 0;
 }
